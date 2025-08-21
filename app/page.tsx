@@ -7,8 +7,18 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Edit, Plus, Save, X, Calendar } from "lucide-react"
+import { Edit, Plus, Save, X, Calendar, Trash2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface ReleaseNote {
   id: string
@@ -98,6 +108,8 @@ export default function ReleaseNotesApp() {
     content: "",
     type: "minor" as const,
   })
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [noteToDelete, setNoteToDelete] = useState<ReleaseNote | null>(null)
 
   const handleEdit = () => {
     if (selectedNote) {
@@ -164,6 +176,31 @@ export default function ReleaseNotesApp() {
     })
   }
 
+  const handleDeleteNote = (note: ReleaseNote) => {
+    setNoteToDelete(note)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = () => {
+    if (noteToDelete) {
+      const updatedNotes = releaseNotes.filter((note) => note.id !== noteToDelete.id)
+      setReleaseNotes(updatedNotes)
+
+      // 삭제된 노트가 현재 선택된 노트라면 다른 노트를 선택하거나 null로 설정
+      if (selectedNote?.id === noteToDelete.id) {
+        setSelectedNote(updatedNotes.length > 0 ? updatedNotes[0] : null)
+      }
+
+      setDeleteDialogOpen(false)
+      setNoteToDelete(null)
+    }
+  }
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false)
+    setNoteToDelete(null)
+  }
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case "major":
@@ -196,7 +233,7 @@ export default function ReleaseNotesApp() {
             {releaseNotes.map((note) => (
               <Card
                 key={note.id}
-                className={`mb-2 cursor-pointer transition-colors hover:bg-accent ${
+                className={`mb-2 cursor-pointer transition-colors hover:bg-accent group ${
                   selectedNote?.id === note.id ? "bg-accent border-primary" : ""
                 }`}
                 onClick={() => setSelectedNote(note)}
@@ -204,7 +241,20 @@ export default function ReleaseNotesApp() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium">{note.version}</CardTitle>
-                    <Badge className={`text-xs ${getTypeColor(note.type)}`}>{note.type}</Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge className={`text-xs ${getTypeColor(note.type)}`}>{note.type}</Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteNote(note)
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-1">{note.title}</p>
                 </CardHeader>
@@ -351,6 +401,28 @@ export default function ReleaseNotesApp() {
           </div>
         )}
       </div>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>릴리즈 노트 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 "{noteToDelete?.version} - {noteToDelete?.title}" 릴리즈 노트를 삭제하시겠습니까?
+              <br />이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDelete}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
