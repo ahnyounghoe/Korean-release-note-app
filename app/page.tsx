@@ -7,9 +7,17 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Edit, Plus, Save, X, Calendar, Trash2, FolderPlus } from "lucide-react"
+import { Edit, Plus, Save, X, Calendar, Trash2, FolderPlus, Send, History, Lock } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +37,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+interface PublishHistory {
+  id: string
+  timestamp: string
+  publisher: string
+  version: string
+}
+
 interface ReleaseNote {
   id: string
   version: string
@@ -36,6 +51,8 @@ interface ReleaseNote {
   date: string
   content: string
   type: "major" | "minor" | "patch"
+  isPublished: boolean
+  publishHistory: PublishHistory[]
 }
 
 interface App {
@@ -71,6 +88,15 @@ const initialApps: App[] = [
 - 검색 기능 정확도 개선
 - 메모리 누수 문제 해결`,
         type: "minor",
+        isPublished: true,
+        publishHistory: [
+          {
+            id: "1",
+            timestamp: "2024-01-15T10:30:00Z",
+            publisher: "김개발",
+            version: "v2.1.0",
+          },
+        ],
       },
       {
         id: "2",
@@ -89,6 +115,8 @@ const initialApps: App[] = [
 - 파일 업로드 실패 문제 수정
 - 알림 중복 표시 문제 해결`,
         type: "patch",
+        isPublished: false,
+        publishHistory: [],
       },
       {
         id: "3",
@@ -112,6 +140,21 @@ const initialApps: App[] = [
 - 고급 분석 대시보드
 - 사용자 권한 관리 시스템`,
         type: "major",
+        isPublished: true,
+        publishHistory: [
+          {
+            id: "2",
+            timestamp: "2023-12-20T14:15:00Z",
+            publisher: "박매니저",
+            version: "v2.0.0",
+          },
+          {
+            id: "3",
+            timestamp: "2023-12-21T09:20:00Z",
+            publisher: "김개발",
+            version: "v2.0.0",
+          },
+        ],
       },
     ],
   },
@@ -135,6 +178,8 @@ const initialApps: App[] = [
 - 앱 시작 속도 개선
 - 메모리 사용량 최적화`,
         type: "minor",
+        isPublished: false,
+        publishHistory: [],
       },
     ],
   },
@@ -146,17 +191,18 @@ export default function ReleaseNotesApp() {
   const [selectedNote, setSelectedNote] = useState<ReleaseNote | null>(initialApps[0].releaseNotes[0])
   const [isEditing, setIsEditing] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
-  const [editContent, setEditContent] = useState("")
-  const [newNote, setNewNote] = useState({
-    version: "",
-    title: "",
-    content: "",
-    type: "minor" as const,
-  })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [noteToDelete, setNoteToDelete] = useState<ReleaseNote | null>(null)
   const [newAppDialogOpen, setNewAppDialogOpen] = useState(false)
   const [newAppName, setNewAppName] = useState("")
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [publisherName, setPublisherName] = useState("")
+  const [newNote, setNewNote] = useState({
+    version: "",
+    title: "",
+    content: "",
+    type: "minor",
+  })
 
   const currentApp = apps.find((app) => app.id === selectedAppId)
   const currentReleaseNotes = currentApp?.releaseNotes || []
@@ -190,42 +236,16 @@ export default function ReleaseNotesApp() {
 
   const handleEdit = () => {
     if (selectedNote) {
-      setEditContent(selectedNote.content)
       setIsEditing(true)
-    }
-  }
-
-  const handleSave = () => {
-    if (selectedNote && currentApp) {
-      const updatedApps = apps.map((app) =>
-        app.id === currentApp.id
-          ? {
-              ...app,
-              releaseNotes: app.releaseNotes.map((note) =>
-                note.id === selectedNote.id ? { ...note, content: editContent } : note,
-              ),
-            }
-          : app,
-      )
-      setApps(updatedApps)
-      setSelectedNote({ ...selectedNote, content: editContent })
-      setIsEditing(false)
     }
   }
 
   const handleCancel = () => {
     setIsEditing(false)
-    setEditContent("")
   }
 
   const handleCreateNew = () => {
     setIsCreating(true)
-    setNewNote({
-      version: "",
-      title: "",
-      content: "",
-      type: "minor",
-    })
   }
 
   const handleSaveNew = () => {
@@ -237,6 +257,8 @@ export default function ReleaseNotesApp() {
         date: new Date().toISOString().split("T")[0],
         content: newNote.content,
         type: newNote.type,
+        isPublished: false,
+        publishHistory: [],
       }
 
       const updatedApps = apps.map((app) =>
@@ -293,6 +315,64 @@ export default function ReleaseNotesApp() {
   const cancelDelete = () => {
     setDeleteDialogOpen(false)
     setNoteToDelete(null)
+  }
+
+  const handlePublish = () => {
+    setPublishDialogOpen(true)
+    setPublisherName("")
+  }
+
+  const confirmPublish = () => {
+    if (selectedNote && currentApp && publisherName.trim()) {
+      const newPublishRecord: PublishHistory = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        publisher: publisherName.trim(),
+        version: selectedNote.version,
+      }
+
+      const updatedApps = apps.map((app) =>
+        app.id === currentApp.id
+          ? {
+              ...app,
+              releaseNotes: app.releaseNotes.map((note) =>
+                note.id === selectedNote.id
+                  ? {
+                      ...note,
+                      isPublished: true,
+                      publishHistory: [newPublishRecord, ...note.publishHistory],
+                    }
+                  : note,
+              ),
+            }
+          : app,
+      )
+
+      setApps(updatedApps)
+      setSelectedNote({
+        ...selectedNote,
+        isPublished: true,
+        publishHistory: [newPublishRecord, ...selectedNote.publishHistory],
+      })
+      setPublishDialogOpen(false)
+      setPublisherName("")
+    }
+  }
+
+  const cancelPublish = () => {
+    setPublishDialogOpen(false)
+    setPublisherName("")
+  }
+
+  const formatDateTime = (timestamp: string) => {
+    const date = new Date(timestamp)
+    return date.toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
 
   const getTypeColor = (type: string) => {
@@ -355,9 +435,17 @@ export default function ReleaseNotesApp() {
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">{note.version}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-sm font-medium">{note.version}</CardTitle>
+                        {note.isPublished && <Lock className="w-3 h-3 text-green-600" />}
+                      </div>
                       <div className="flex items-center gap-1">
                         <Badge className={`text-xs ${getTypeColor(note.type)}`}>{note.type}</Badge>
+                        {note.isPublished && (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            발행됨
+                          </Badge>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -374,9 +462,14 @@ export default function ReleaseNotesApp() {
                     <p className="text-sm text-muted-foreground line-clamp-1">{note.title}</p>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      {note.date}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {note.date}
+                      </div>
+                      {note.publishHistory.length > 0 && (
+                        <div className="text-xs text-muted-foreground">발행 {note.publishHistory.length}회</div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -460,6 +553,12 @@ export default function ReleaseNotesApp() {
                     <div className="flex items-center gap-3 mb-2">
                       <h1 className="text-3xl font-bold">{selectedNote.version}</h1>
                       <Badge className={getTypeColor(selectedNote.type)}>{selectedNote.type}</Badge>
+                      {selectedNote.isPublished && (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <Lock className="w-3 h-3 mr-1" />
+                          발행됨
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-lg text-muted-foreground mb-2">{selectedNote.title}</p>
                     <div className="flex items-center text-sm text-muted-foreground">
@@ -470,20 +569,56 @@ export default function ReleaseNotesApp() {
                   <div className="flex gap-2">
                     {isEditing ? (
                       <>
-                        <Button onClick={handleSave}>
+                        <Button onClick={handleSaveNew}>
                           <Save className="w-4 h-4 mr-2" />
                           저장
                         </Button>
-                        <Button variant="outline" onClick={handleCancel}>
+                        <Button variant="outline" onClick={handleCancelNew}>
                           <X className="w-4 h-4 mr-2" />
                           취소
                         </Button>
                       </>
                     ) : (
-                      <Button onClick={handleEdit}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        편집
-                      </Button>
+                      <>
+                        <Button onClick={handleEdit} disabled={selectedNote.isPublished}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          편집
+                        </Button>
+                        {!selectedNote.isPublished && (
+                          <Button onClick={handlePublish}>
+                            <Send className="w-4 h-4 mr-2" />
+                            발행
+                          </Button>
+                        )}
+                        {selectedNote.publishHistory.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline">
+                                <History className="w-4 h-4 mr-2" />
+                                발행 이력 ({selectedNote.publishHistory.length})
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-80">
+                              <DropdownMenuLabel>발행 이력</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {selectedNote.publishHistory.map((history, index) => (
+                                <DropdownMenuItem key={history.id} className="flex flex-col items-start p-3">
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="font-medium">{history.publisher}</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      #{selectedNote.publishHistory.length - index}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    {formatDateTime(history.timestamp)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">버전: {history.version}</div>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -495,10 +630,23 @@ export default function ReleaseNotesApp() {
               <div className="max-w-4xl mx-auto">
                 {isEditing ? (
                   <Textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full min-h-[500px] font-mono"
                     placeholder="Markdown으로 내용을 작성하세요..."
+                    value={selectedNote.content}
+                    onChange={(e) =>
+                      setApps((prevApps) =>
+                        prevApps.map((app) =>
+                          app.id === currentApp?.id
+                            ? {
+                                ...app,
+                                releaseNotes: app.releaseNotes.map((note) =>
+                                  note.id === selectedNote.id ? { ...note, content: e.target.value } : note,
+                                ),
+                              }
+                            : app,
+                        ),
+                      )
+                    }
+                    className="w-full min-h-[500px] font-mono"
                   />
                 ) : (
                   <div className="prose prose-gray dark:prose-invert max-w-none">
@@ -549,6 +697,40 @@ export default function ReleaseNotesApp() {
             </Button>
             <Button onClick={handleAddNewApp} disabled={!newAppName.trim()}>
               추가
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 발행 다이얼로그 */}
+      <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>릴리즈 노트 발행</DialogTitle>
+            <DialogDescription>
+              릴리즈 노트를 발행하면 조회 전용으로 변경되며 편집할 수 없습니다. 발행자 이름을 입력해주세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-2 block">발행자</label>
+            <Input
+              placeholder="발행자 이름을 입력하세요"
+              value={publisherName}
+              onChange={(e) => setPublisherName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  confirmPublish()
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelPublish}>
+              취소
+            </Button>
+            <Button onClick={confirmPublish} disabled={!publisherName.trim()}>
+              <Send className="w-4 h-4 mr-2" />
+              발행
             </Button>
           </DialogFooter>
         </DialogContent>
