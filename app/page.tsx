@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Edit, Plus, Save, X, Calendar, Trash2 } from "lucide-react"
+import { Edit, Plus, Save, X, Calendar, Trash2, FolderPlus } from "lucide-react"
 import ReactMarkdown from "react-markdown"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +20,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface ReleaseNote {
   id: string
@@ -29,13 +38,23 @@ interface ReleaseNote {
   type: "major" | "minor" | "patch"
 }
 
-const initialReleaseNotes: ReleaseNote[] = [
+interface App {
+  id: string
+  name: string
+  releaseNotes: ReleaseNote[]
+}
+
+const initialApps: App[] = [
   {
     id: "1",
-    version: "v2.1.0",
-    title: "새로운 디자인 시스템 도입",
-    date: "2024-01-15",
-    content: `# v2.1.0 - 새로운 디자인 시스템 도입
+    name: "리바이티엔",
+    releaseNotes: [
+      {
+        id: "1",
+        version: "v2.1.0",
+        title: "새로운 디자인 시스템 도입",
+        date: "2024-01-15",
+        content: `# v2.1.0 - 새로운 디자인 시스템 도입
 
 ## 🎨 새로운 기능
 - **디자인 시스템 2.0**: 완전히 새로워진 UI/UX 디자인
@@ -51,14 +70,14 @@ const initialReleaseNotes: ReleaseNote[] = [
 - 사이드바 스크롤 이슈 해결
 - 검색 기능 정확도 개선
 - 메모리 누수 문제 해결`,
-    type: "minor",
-  },
-  {
-    id: "2",
-    version: "v2.0.5",
-    title: "성능 최적화 및 버그 수정",
-    date: "2024-01-08",
-    content: `# v2.0.5 - 성능 최적화 및 버그 수정
+        type: "minor",
+      },
+      {
+        id: "2",
+        version: "v2.0.5",
+        title: "성능 최적화 및 버그 수정",
+        date: "2024-01-08",
+        content: `# v2.0.5 - 성능 최적화 및 버그 수정
 
 ## 🔧 개선사항
 - 데이터베이스 쿼리 최적화
@@ -69,14 +88,14 @@ const initialReleaseNotes: ReleaseNote[] = [
 - 로그인 세션 만료 이슈 해결
 - 파일 업로드 실패 문제 수정
 - 알림 중복 표시 문제 해결`,
-    type: "patch",
-  },
-  {
-    id: "3",
-    version: "v2.0.0",
-    title: "메이저 업데이트 - 새로운 아키텍처",
-    date: "2023-12-20",
-    content: `# v2.0.0 - 메이저 업데이트
+        type: "patch",
+      },
+      {
+        id: "3",
+        version: "v2.0.0",
+        title: "메이저 업데이트 - 새로운 아키텍처",
+        date: "2023-12-20",
+        content: `# v2.0.0 - 메이저 업데이트
 
 ## 🚀 주요 변경사항
 - **새로운 아키텍처**: 마이크로서비스 기반으로 전환
@@ -92,13 +111,39 @@ const initialReleaseNotes: ReleaseNote[] = [
 - 실시간 협업 기능
 - 고급 분석 대시보드
 - 사용자 권한 관리 시스템`,
-    type: "major",
+        type: "major",
+      },
+    ],
+  },
+  {
+    id: "2",
+    name: "모바일 앱",
+    releaseNotes: [
+      {
+        id: "4",
+        version: "v1.2.0",
+        title: "푸시 알림 기능 추가",
+        date: "2024-01-10",
+        content: `# v1.2.0 - 푸시 알림 기능 추가
+
+## 🔔 새로운 기능
+- **푸시 알림**: 실시간 알림 수신 기능
+- **알림 설정**: 사용자 맞춤 알림 설정
+- **배지 표시**: 읽지 않은 알림 개수 표시
+
+## 🔧 개선사항
+- 앱 시작 속도 개선
+- 메모리 사용량 최적화`,
+        type: "minor",
+      },
+    ],
   },
 ]
 
 export default function ReleaseNotesApp() {
-  const [releaseNotes, setReleaseNotes] = useState<ReleaseNote[]>(initialReleaseNotes)
-  const [selectedNote, setSelectedNote] = useState<ReleaseNote | null>(releaseNotes[0])
+  const [apps, setApps] = useState<App[]>(initialApps)
+  const [selectedAppId, setSelectedAppId] = useState<string>(initialApps[0].id)
+  const [selectedNote, setSelectedNote] = useState<ReleaseNote | null>(initialApps[0].releaseNotes[0])
   const [isEditing, setIsEditing] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [editContent, setEditContent] = useState("")
@@ -110,6 +155,38 @@ export default function ReleaseNotesApp() {
   })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [noteToDelete, setNoteToDelete] = useState<ReleaseNote | null>(null)
+  const [newAppDialogOpen, setNewAppDialogOpen] = useState(false)
+  const [newAppName, setNewAppName] = useState("")
+
+  const currentApp = apps.find((app) => app.id === selectedAppId)
+  const currentReleaseNotes = currentApp?.releaseNotes || []
+
+  const handleAppChange = (appId: string) => {
+    setSelectedAppId(appId)
+    const app = apps.find((a) => a.id === appId)
+    if (app && app.releaseNotes.length > 0) {
+      setSelectedNote(app.releaseNotes[0])
+    } else {
+      setSelectedNote(null)
+    }
+    setIsEditing(false)
+    setIsCreating(false)
+  }
+
+  const handleAddNewApp = () => {
+    if (newAppName.trim()) {
+      const newApp: App = {
+        id: Date.now().toString(),
+        name: newAppName.trim(),
+        releaseNotes: [],
+      }
+      setApps([...apps, newApp])
+      setSelectedAppId(newApp.id)
+      setSelectedNote(null)
+      setNewAppDialogOpen(false)
+      setNewAppName("")
+    }
+  }
 
   const handleEdit = () => {
     if (selectedNote) {
@@ -119,11 +196,18 @@ export default function ReleaseNotesApp() {
   }
 
   const handleSave = () => {
-    if (selectedNote) {
-      const updatedNotes = releaseNotes.map((note) =>
-        note.id === selectedNote.id ? { ...note, content: editContent } : note,
+    if (selectedNote && currentApp) {
+      const updatedApps = apps.map((app) =>
+        app.id === currentApp.id
+          ? {
+              ...app,
+              releaseNotes: app.releaseNotes.map((note) =>
+                note.id === selectedNote.id ? { ...note, content: editContent } : note,
+              ),
+            }
+          : app,
       )
-      setReleaseNotes(updatedNotes)
+      setApps(updatedApps)
       setSelectedNote({ ...selectedNote, content: editContent })
       setIsEditing(false)
     }
@@ -145,7 +229,7 @@ export default function ReleaseNotesApp() {
   }
 
   const handleSaveNew = () => {
-    if (newNote.version && newNote.title && newNote.content) {
+    if (newNote.version && newNote.title && newNote.content && currentApp) {
       const newReleaseNote: ReleaseNote = {
         id: Date.now().toString(),
         version: newNote.version,
@@ -154,7 +238,12 @@ export default function ReleaseNotesApp() {
         content: newNote.content,
         type: newNote.type,
       }
-      setReleaseNotes([newReleaseNote, ...releaseNotes])
+
+      const updatedApps = apps.map((app) =>
+        app.id === currentApp.id ? { ...app, releaseNotes: [newReleaseNote, ...app.releaseNotes] } : app,
+      )
+
+      setApps(updatedApps)
       setSelectedNote(newReleaseNote)
       setIsCreating(false)
       setNewNote({
@@ -182,13 +271,18 @@ export default function ReleaseNotesApp() {
   }
 
   const confirmDelete = () => {
-    if (noteToDelete) {
-      const updatedNotes = releaseNotes.filter((note) => note.id !== noteToDelete.id)
-      setReleaseNotes(updatedNotes)
+    if (noteToDelete && currentApp) {
+      const updatedApps = apps.map((app) =>
+        app.id === currentApp.id
+          ? { ...app, releaseNotes: app.releaseNotes.filter((note) => note.id !== noteToDelete.id) }
+          : app,
+      )
+      setApps(updatedApps)
 
       // 삭제된 노트가 현재 선택된 노트라면 다른 노트를 선택하거나 null로 설정
       if (selectedNote?.id === noteToDelete.id) {
-        setSelectedNote(updatedNotes.length > 0 ? updatedNotes[0] : null)
+        const updatedApp = updatedApps.find((app) => app.id === currentApp.id)
+        setSelectedNote(updatedApp && updatedApp.releaseNotes.length > 0 ? updatedApp.releaseNotes[0] : null)
       }
 
       setDeleteDialogOpen(false)
@@ -220,52 +314,74 @@ export default function ReleaseNotesApp() {
       <div className="w-80 border-r bg-muted/30">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold">릴리즈 노트</h1>
-            <Button size="sm" onClick={handleCreateNew}>
-              <Plus className="w-4 h-4 mr-1" />
-              새로 만들기
-            </Button>
+            <div className="flex items-center gap-2 flex-1">
+              <Select value={selectedAppId} onValueChange={handleAppChange}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="앱 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {apps.map((app) => (
+                    <SelectItem key={app.id} value={app.id}>
+                      {app.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" onClick={() => setNewAppDialogOpen(true)} className="shrink-0">
+                <FolderPlus className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
+          <Button size="sm" onClick={handleCreateNew} className="w-full">
+            <Plus className="w-4 h-4 mr-1" />새 릴리즈 노트
+          </Button>
         </div>
 
         <ScrollArea className="flex-1">
           <div className="p-2">
-            {releaseNotes.map((note) => (
-              <Card
-                key={note.id}
-                className={`mb-2 cursor-pointer transition-colors hover:bg-accent group ${
-                  selectedNote?.id === note.id ? "bg-accent border-primary" : ""
-                }`}
-                onClick={() => setSelectedNote(note)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">{note.version}</CardTitle>
-                    <div className="flex items-center gap-1">
-                      <Badge className={`text-xs ${getTypeColor(note.type)}`}>{note.type}</Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteNote(note)
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+            {currentReleaseNotes.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">릴리즈 노트가 없습니다.</p>
+                <p className="text-xs mt-1">새 릴리즈 노트를 작성해보세요.</p>
+              </div>
+            ) : (
+              currentReleaseNotes.map((note) => (
+                <Card
+                  key={note.id}
+                  className={`mb-2 cursor-pointer transition-colors hover:bg-accent group ${
+                    selectedNote?.id === note.id ? "bg-accent border-primary" : ""
+                  }`}
+                  onClick={() => setSelectedNote(note)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">{note.version}</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <Badge className={`text-xs ${getTypeColor(note.type)}`}>{note.type}</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteNote(note)
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground line-clamp-1">{note.title}</p>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {note.date}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <p className="text-sm text-muted-foreground line-clamp-1">{note.title}</p>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {note.date}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </ScrollArea>
       </div>
@@ -395,12 +511,48 @@ export default function ReleaseNotesApp() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <h2 className="text-xl font-semibold mb-2">릴리즈 노트를 선택하세요</h2>
-              <p className="text-muted-foreground">왼쪽 목록에서 릴리즈 노트를 선택하여 내용을 확인하세요.</p>
+              <h2 className="text-xl font-semibold mb-2">
+                {currentApp ? "릴리즈 노트를 선택하거나 새로 작성하세요" : "앱을 선택하세요"}
+              </h2>
+              <p className="text-muted-foreground">
+                {currentApp
+                  ? "왼쪽 목록에서 릴리즈 노트를 선택하거나 새 릴리즈 노트를 작성해보세요."
+                  : "상단에서 앱을 선택하거나 새 앱을 추가해보세요."}
+              </p>
             </div>
           </div>
         )}
       </div>
+
+      {/* 새 앱 추가 다이얼로그 */}
+      <Dialog open={newAppDialogOpen} onOpenChange={setNewAppDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>새 앱 추가</DialogTitle>
+            <DialogDescription>새로운 앱의 릴리즈 노트를 관리하기 위해 앱 이름을 입력하세요.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="앱 이름을 입력하세요"
+              value={newAppName}
+              onChange={(e) => setNewAppName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleAddNewApp()
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewAppDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handleAddNewApp} disabled={!newAppName.trim()}>
+              추가
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 삭제 확인 다이얼로그 */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
