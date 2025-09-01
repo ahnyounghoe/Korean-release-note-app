@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Edit, Plus, Save, X, Calendar, Trash2, FolderPlus, Send, History, Lock } from "lucide-react"
+import { Edit, Plus, Save, X, Calendar, Trash2, FolderPlus, Send, History, Lock, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -36,159 +36,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-
-interface PublishHistory {
-  id: string
-  timestamp: string
-  publisher: string
-  version: string
-}
-
-interface ReleaseNote {
-  id: string
-  version: string
-  title: string
-  date: string
-  content: string
-  type: "major" | "minor" | "patch"
-  isPublished: boolean
-  publishHistory: PublishHistory[]
-}
-
-interface App {
-  id: string
-  name: string
-  releaseNotes: ReleaseNote[]
-}
-
-const initialApps: App[] = [
-  {
-    id: "1",
-    name: "리바이티엔",
-    releaseNotes: [
-      {
-        id: "1",
-        version: "v2.1.0",
-        title: "새로운 디자인 시스템 도입",
-        date: "2024-01-15",
-        content: `# v2.1.0 - 새로운 디자인 시스템 도입
-
-## 🎨 새로운 기능
-- **디자인 시스템 2.0**: 완전히 새로워진 UI/UX 디자인
-- **다크 모드 지원**: 사용자 선호도에 따른 테마 전환
-- **반응형 디자인**: 모든 디바이스에서 최적화된 경험
-
-## 🔧 개선사항
-- 페이지 로딩 속도 30% 향상
-- 접근성 개선 (WCAG 2.1 AA 준수)
-- 모바일 터치 인터페이스 개선
-
-## 🐛 버그 수정
-- 사이드바 스크롤 이슈 해결
-- 검색 기능 정확도 개선
-- 메모리 누수 문제 해결`,
-        type: "minor",
-        isPublished: true,
-        publishHistory: [
-          {
-            id: "1",
-            timestamp: "2024-01-15T10:30:00Z",
-            publisher: "김개발",
-            version: "v2.1.0",
-          },
-        ],
-      },
-      {
-        id: "2",
-        version: "v2.0.5",
-        title: "성능 최적화 및 버그 수정",
-        date: "2024-01-08",
-        content: `# v2.0.5 - 성능 최적화 및 버그 수정
-
-## 🔧 개선사항
-- 데이터베이스 쿼리 최적화
-- 캐싱 전략 개선
-- 번들 크기 20% 감소
-
-## 🐛 버그 수정
-- 로그인 세션 만료 이슈 해결
-- 파일 업로드 실패 문제 수정
-- 알림 중복 표시 문제 해결`,
-        type: "patch",
-        isPublished: false,
-        publishHistory: [],
-      },
-      {
-        id: "3",
-        version: "v2.0.0",
-        title: "메이저 업데이트 - 새로운 아키텍처",
-        date: "2023-12-20",
-        content: `# v2.0.0 - 메이저 업데이트
-
-## 🚀 주요 변경사항
-- **새로운 아키텍처**: 마이크로서비스 기반으로 전환
-- **API v2**: RESTful API 완전 재설계
-- **실시간 기능**: WebSocket 기반 실시간 업데이트
-
-## ⚠️ 주요 변경사항 (Breaking Changes)
-- API v1 지원 종료 (2024년 6월까지 지원)
-- 구 버전 클라이언트 호환성 제거
-- 데이터베이스 스키마 변경
-
-## 🎯 새로운 기능
-- 실시간 협업 기능
-- 고급 분석 대시보드
-- 사용자 권한 관리 시스템`,
-        type: "major",
-        isPublished: true,
-        publishHistory: [
-          {
-            id: "2",
-            timestamp: "2023-12-20T14:15:00Z",
-            publisher: "박매니저",
-            version: "v2.0.0",
-          },
-          {
-            id: "3",
-            timestamp: "2023-12-21T09:20:00Z",
-            publisher: "김개발",
-            version: "v2.0.0",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "모바일 앱",
-    releaseNotes: [
-      {
-        id: "4",
-        version: "v1.2.0",
-        title: "푸시 알림 기능 추가",
-        date: "2024-01-10",
-        content: `# v1.2.0 - 푸시 알림 기능 추가
-
-## 🔔 새로운 기능
-- **푸시 알림**: 실시간 알림 수신 기능
-- **알림 설정**: 사용자 맞춤 알림 설정
-- **배지 표시**: 읽지 않은 알림 개수 표시
-
-## 🔧 개선사항
-- 앱 시작 속도 개선
-- 메모리 사용량 최적화`,
-        type: "minor",
-        isPublished: false,
-        publishHistory: [],
-      },
-    ],
-  },
-]
+import { appApi, releaseApi } from "@/lib/api-client"
+import { AppWithReleases, ReleaseNote } from "@/lib/types"
 
 export default function ReleaseNotesApp() {
-  const [apps, setApps] = useState<App[]>(initialApps)
-  const [selectedAppId, setSelectedAppId] = useState<string>(initialApps[0].id)
-  const [selectedNote, setSelectedNote] = useState<ReleaseNote | null>(initialApps[0].releaseNotes[0])
+  const [apps, setApps] = useState<AppWithReleases[]>([])
+  const [selectedAppId, setSelectedAppId] = useState<string>("")
+  const [selectedNote, setSelectedNote] = useState<ReleaseNote | null>(null)
+  const [editingContent, setEditingContent] = useState<string>("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -201,11 +58,50 @@ export default function ReleaseNotesApp() {
     version: "",
     title: "",
     content: "",
-    type: "minor",
+    type: "minor" as "major" | "minor" | "patch",
   })
 
   const currentApp = apps.find((app) => app.id === selectedAppId)
   const currentReleaseNotes = currentApp?.releaseNotes || []
+
+  // 데이터 로딩
+  useEffect(() => {
+    loadApps()
+  }, [])
+
+  const loadApps = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const appsData = await appApi.getAll()
+      setApps(appsData)
+      
+      if (appsData.length > 0) {
+        setSelectedAppId(appsData[0].id)
+        if (appsData[0].releaseNotes.length > 0) {
+          setSelectedNote(appsData[0].releaseNotes[0])
+        }
+      }
+    } catch (err) {
+      setError('앱 목록을 불러오는데 실패했습니다.')
+      console.error('Error loading apps:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const refreshCurrentApp = async () => {
+    if (selectedAppId) {
+      try {
+        const appData = await appApi.getById(selectedAppId)
+        setApps(prevApps => 
+          prevApps.map(app => app.id === selectedAppId ? appData : app)
+        )
+      } catch (err) {
+        console.error('Error refreshing app:', err)
+      }
+    }
+  }
 
   const handleAppChange = (appId: string) => {
     setSelectedAppId(appId)
@@ -219,28 +115,60 @@ export default function ReleaseNotesApp() {
     setIsCreating(false)
   }
 
-  const handleAddNewApp = () => {
+  const handleAddNewApp = async () => {
     if (newAppName.trim()) {
-      const newApp: App = {
-        id: Date.now().toString(),
-        name: newAppName.trim(),
-        releaseNotes: [],
+      try {
+        const newApp = await appApi.create({ name: newAppName.trim() })
+        const appWithReleases = { ...newApp, releaseNotes: [] }
+        setApps([...apps, appWithReleases])
+        setSelectedAppId(newApp.id)
+        setSelectedNote(null)
+        setNewAppDialogOpen(false)
+        setNewAppName("")
+      } catch (err) {
+        setError('앱 생성에 실패했습니다.')
+        console.error('Error creating app:', err)
       }
-      setApps([...apps, newApp])
-      setSelectedAppId(newApp.id)
-      setSelectedNote(null)
-      setNewAppDialogOpen(false)
-      setNewAppName("")
     }
   }
 
   const handleEdit = () => {
     if (selectedNote) {
+      setEditingContent(selectedNote.content)
       setIsEditing(true)
     }
   }
 
+  const handleSave = async () => {
+    if (selectedNote && currentApp) {
+      try {
+        const updatedRelease = await releaseApi.update(currentApp.id, selectedNote.id, {
+          content: editingContent
+        })
+
+        setApps(prevApps =>
+          prevApps.map((app) =>
+            app.id === currentApp.id
+              ? {
+                  ...app,
+                  releaseNotes: app.releaseNotes.map((note) =>
+                    note.id === selectedNote.id ? updatedRelease : note,
+                  ),
+                }
+              : app,
+          )
+        )
+        setSelectedNote(updatedRelease)
+        setIsEditing(false)
+      } catch (err) {
+        setError('릴리즈 노트 수정에 실패했습니다.')
+        console.error('Error updating release:', err)
+      }
+    }
+  }
+
   const handleCancel = () => {
+    setEditingContent("")
     setIsEditing(false)
   }
 
@@ -248,32 +176,33 @@ export default function ReleaseNotesApp() {
     setIsCreating(true)
   }
 
-  const handleSaveNew = () => {
+  const handleSaveNew = async () => {
     if (newNote.version && newNote.title && newNote.content && currentApp) {
-      const newReleaseNote: ReleaseNote = {
-        id: Date.now().toString(),
-        version: newNote.version,
-        title: newNote.title,
-        date: new Date().toISOString().split("T")[0],
-        content: newNote.content,
-        type: newNote.type,
-        isPublished: false,
-        publishHistory: [],
+      try {
+        const newReleaseNote = await releaseApi.create(currentApp.id, {
+          version: newNote.version,
+          title: newNote.title,
+          content: newNote.content,
+          type: newNote.type,
+        })
+
+        setApps(prevApps =>
+          prevApps.map((app) =>
+            app.id === currentApp.id ? { ...app, releaseNotes: [newReleaseNote, ...app.releaseNotes] } : app,
+          )
+        )
+        setSelectedNote(newReleaseNote)
+        setIsCreating(false)
+        setNewNote({
+          version: "",
+          title: "",
+          content: "",
+          type: "minor" as "major" | "minor" | "patch",
+        })
+      } catch (err) {
+        setError('릴리즈 노트 생성에 실패했습니다.')
+        console.error('Error creating release:', err)
       }
-
-      const updatedApps = apps.map((app) =>
-        app.id === currentApp.id ? { ...app, releaseNotes: [newReleaseNote, ...app.releaseNotes] } : app,
-      )
-
-      setApps(updatedApps)
-      setSelectedNote(newReleaseNote)
-      setIsCreating(false)
-      setNewNote({
-        version: "",
-        title: "",
-        content: "",
-        type: "minor",
-      })
     }
   }
 
@@ -283,7 +212,7 @@ export default function ReleaseNotesApp() {
       version: "",
       title: "",
       content: "",
-      type: "minor",
+      type: "minor" as "major" | "minor" | "patch",
     })
   }
 
@@ -292,23 +221,32 @@ export default function ReleaseNotesApp() {
     setDeleteDialogOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (noteToDelete && currentApp) {
-      const updatedApps = apps.map((app) =>
-        app.id === currentApp.id
-          ? { ...app, releaseNotes: app.releaseNotes.filter((note) => note.id !== noteToDelete.id) }
-          : app,
-      )
-      setApps(updatedApps)
+      try {
+        await releaseApi.delete(currentApp.id, noteToDelete.id)
+        
+        setApps(prevApps =>
+          prevApps.map((app) =>
+            app.id === currentApp.id
+              ? { ...app, releaseNotes: app.releaseNotes.filter((note) => note.id !== noteToDelete.id) }
+              : app,
+          )
+        )
 
-      // 삭제된 노트가 현재 선택된 노트라면 다른 노트를 선택하거나 null로 설정
-      if (selectedNote?.id === noteToDelete.id) {
-        const updatedApp = updatedApps.find((app) => app.id === currentApp.id)
-        setSelectedNote(updatedApp && updatedApp.releaseNotes.length > 0 ? updatedApp.releaseNotes[0] : null)
+        // 삭제된 노트가 현재 선택된 노트라면 다른 노트를 선택하거나 null로 설정
+        if (selectedNote?.id === noteToDelete.id) {
+          const updatedApp = apps.find((app) => app.id === currentApp.id)
+          const remainingNotes = updatedApp?.releaseNotes.filter((note) => note.id !== noteToDelete.id) || []
+          setSelectedNote(remainingNotes.length > 0 ? remainingNotes[0] : null)
+        }
+
+        setDeleteDialogOpen(false)
+        setNoteToDelete(null)
+      } catch (err) {
+        setError('릴리즈 노트 삭제에 실패했습니다.')
+        console.error('Error deleting release:', err)
       }
-
-      setDeleteDialogOpen(false)
-      setNoteToDelete(null)
     }
   }
 
@@ -322,40 +260,32 @@ export default function ReleaseNotesApp() {
     setPublisherName("")
   }
 
-  const confirmPublish = () => {
+  const confirmPublish = async () => {
     if (selectedNote && currentApp && publisherName.trim()) {
-      const newPublishRecord: PublishHistory = {
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        publisher: publisherName.trim(),
-        version: selectedNote.version,
+      try {
+        const publishedRelease = await releaseApi.publish(currentApp.id, selectedNote.id, {
+          publisher: publisherName.trim()
+        })
+
+        setApps(prevApps =>
+          prevApps.map((app) =>
+            app.id === currentApp.id
+              ? {
+                  ...app,
+                  releaseNotes: app.releaseNotes.map((note) =>
+                    note.id === selectedNote.id ? publishedRelease : note,
+                  ),
+                }
+              : app,
+          )
+        )
+        setSelectedNote(publishedRelease)
+        setPublishDialogOpen(false)
+        setPublisherName("")
+      } catch (err) {
+        setError('릴리즈 노트 발행에 실패했습니다.')
+        console.error('Error publishing release:', err)
       }
-
-      const updatedApps = apps.map((app) =>
-        app.id === currentApp.id
-          ? {
-              ...app,
-              releaseNotes: app.releaseNotes.map((note) =>
-                note.id === selectedNote.id
-                  ? {
-                      ...note,
-                      isPublished: true,
-                      publishHistory: [newPublishRecord, ...note.publishHistory],
-                    }
-                  : note,
-              ),
-            }
-          : app,
-      )
-
-      setApps(updatedApps)
-      setSelectedNote({
-        ...selectedNote,
-        isPublished: true,
-        publishHistory: [newPublishRecord, ...selectedNote.publishHistory],
-      })
-      setPublishDialogOpen(false)
-      setPublisherName("")
     }
   }
 
@@ -386,6 +316,28 @@ export default function ReleaseNotesApp() {
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-4">{error}</p>
+          <Button onClick={loadApps}>다시 시도</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -514,7 +466,7 @@ export default function ReleaseNotesApp() {
                     <select
                       className="w-full p-2 border rounded-md"
                       value={newNote.type}
-                      onChange={(e) => setNewNote({ ...newNote, type: e.target.value as any })}
+                      onChange={(e) => setNewNote({ ...newNote, type: e.target.value as "major" | "minor" | "patch" })}
                     >
                       <option value="patch">Patch</option>
                       <option value="minor">Minor</option>
@@ -569,11 +521,11 @@ export default function ReleaseNotesApp() {
                   <div className="flex gap-2">
                     {isEditing ? (
                       <>
-                        <Button onClick={handleSaveNew}>
+                        <Button onClick={handleSave}>
                           <Save className="w-4 h-4 mr-2" />
                           저장
                         </Button>
-                        <Button variant="outline" onClick={handleCancelNew}>
+                        <Button variant="outline" onClick={handleCancel}>
                           <X className="w-4 h-4 mr-2" />
                           취소
                         </Button>
@@ -631,26 +583,31 @@ export default function ReleaseNotesApp() {
                 {isEditing ? (
                   <Textarea
                     placeholder="Markdown으로 내용을 작성하세요..."
-                    value={selectedNote.content}
-                    onChange={(e) =>
-                      setApps((prevApps) =>
-                        prevApps.map((app) =>
-                          app.id === currentApp?.id
-                            ? {
-                                ...app,
-                                releaseNotes: app.releaseNotes.map((note) =>
-                                  note.id === selectedNote.id ? { ...note, content: e.target.value } : note,
-                                ),
-                              }
-                            : app,
-                        ),
-                      )
-                    }
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
                     className="w-full min-h-[500px] font-mono"
                   />
                 ) : (
-                  <div className="prose prose-gray dark:prose-invert max-w-none">
-                    <ReactMarkdown>{selectedNote.content}</ReactMarkdown>
+                  <div className="prose prose-gray dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => <h1 className="text-3xl font-bold mb-6 mt-8 text-foreground border-b border-border pb-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-2xl font-bold mb-4 mt-6 text-foreground">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-xl font-bold mb-3 mt-4 text-foreground">{children}</h3>,
+                        p: ({ children }) => <p className="mb-4 leading-relaxed text-foreground">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2 ml-4">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2 ml-4">{children}</ol>,
+                        li: ({ children }) => <li className="text-foreground">{children}</li>,
+                        strong: ({ children }) => <strong className="font-bold text-foreground">{children}</strong>,
+                        em: ({ children }) => <em className="italic text-foreground">{children}</em>,
+                        code: ({ children }) => <code className="bg-muted text-foreground px-2 py-1 rounded text-sm font-mono border">{children}</code>,
+                        pre: ({ children }) => <pre className="bg-muted text-foreground p-4 rounded-lg overflow-x-auto mb-4 border font-mono text-sm">{children}</pre>,
+                        blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 italic mb-4 bg-muted/50 p-4 rounded-r-lg">{children}</blockquote>,
+                        hr: () => <hr className="my-8 border-border" />,
+                      }}
+                    >
+                      {selectedNote.content}
+                    </ReactMarkdown>
                   </div>
                 )}
               </div>
